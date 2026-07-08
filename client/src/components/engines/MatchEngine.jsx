@@ -1,86 +1,170 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
-/**
- * Generic match-the-following engine. Content shape:
- *   { instruction, pairs: [{ left, right }] }
- * Click one left item then one right item; matched pairs lock in green, wrong picks flash red.
- */
 export default function MatchEngine({ content, onComplete }) {
-  const [rightShuffled] = useState(() => shuffle(content.pairs.map(p => p.right)));
-  const [selectedLeft, setSelectedLeft] = useState(null);
-  const [matched, setMatched] = useState({});      // left -> right
-  const [wrongFlash, setWrongFlash] = useState(null);
-  const [startTime] = useState(() => Date.now());
+  const {
+    instruction = '',
+    pairs = []
+  } = content || {};
 
-  const allMatched = Object.keys(matched).length === content.pairs.length;
+  const [rightItems] = useState(() =>
+    shuffle(pairs.map(p => p.right))
+  );
+
+  const [selectedLeft, setSelectedLeft] = useState(null);
+  const [matched, setMatched] = useState({});
+  const [wrongFlash, setWrongFlash] = useState(null);
+
+  const startTime = useRef(Date.now());
+
+  const allMatched =
+    pairs.length > 0 &&
+    Object.keys(matched).length === pairs.length;
+
+  function pickLeft(left) {
+    if (matched[left]) return;
+    setSelectedLeft(left);
+  }
 
   function pickRight(right) {
     if (!selectedLeft) return;
-    const correctRight = content.pairs.find(p => p.left === selectedLeft)?.right;
-    if (right === correctRight) {
-      setMatched(prev => ({ ...prev, [selectedLeft]: right }));
+
+    const pair = pairs.find(
+      p =>
+        String(p.left).trim().toLowerCase() ===
+        String(selectedLeft).trim().toLowerCase()
+    );
+
+    if (!pair) return;
+
+    const expected = String(pair.right).trim().toLowerCase();
+    const chosen = String(right).trim().toLowerCase();
+
+    if (expected === chosen) {
+      setMatched(prev => ({
+        ...prev,
+        [selectedLeft]: right
+      }));
+
       setSelectedLeft(null);
     } else {
       setWrongFlash(right);
-      setTimeout(() => setWrongFlash(null), 500);
+
+      setTimeout(() => {
+        setWrongFlash(null);
+      }, 500);
     }
   }
 
-  function handleContinue() {
+  function handleSubmit() {
+    let correctCount = 0;
+
+    pairs.forEach(pair => {
+      const placed =
+        matched[pair.left] || '';
+
+      if (
+        String(placed).trim().toLowerCase() ===
+        String(pair.right).trim().toLowerCase()
+      ) {
+        correctCount++;
+      }
+    });
+
+    const score =
+      pairs.length > 0
+        ? correctCount / pairs.length
+        : 0;
+
     onComplete({
-      correct: true,
-      score: 1,
-      timeTakenSeconds: Math.round((Date.now() - startTime) / 1000)
+      correct: score === 1,
+      score,
+      timeTakenSeconds: Math.floor(
+        (Date.now() - startTime.current) / 1000
+      )
     });
   }
 
   return (
     <div className="max-w-xl mx-auto bg-white rounded-xl2 shadow-md p-6 font-body">
-      <p className="font-display font-bold text-lg text-ink mb-5">{content.instruction}</p>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-3">
-          {content.pairs.map(p => (
+
+      <h2 className="font-display font-bold text-xl text-ink mb-6">
+        {instruction}
+      </h2>
+
+      <div className="grid grid-cols-2 gap-5">
+
+        {/* LEFT */}
+
+        <div className="space-y-3">
+          {pairs.map(pair => (
             <button
-              key={p.left}
-              disabled={!!matched[p.left]}
-              onClick={() => setSelectedLeft(p.left)}
-              className={`px-3 py-3 rounded-xl2 font-medium border-2 text-left
-                ${matched[p.left] ? 'border-mint bg-mint/10 text-gray-400' : selectedLeft === p.left ? 'border-sky bg-sky/10' : 'border-gray-200 hover:border-sky'}`}
+              key={pair.left}
+              disabled={!!matched[pair.left]}
+              onClick={() => pickLeft(pair.left)}
+              className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all
+                ${
+                  matched[pair.left]
+                    ? 'border-mint bg-mint bg-opacity-20 text-gray-500'
+                    : selectedLeft === pair.left
+                    ? 'border-sky bg-sky bg-opacity-10'
+                    : 'border-gray-200 hover:border-sky'
+                }`}
             >
-              {p.left}
+              {pair.left}
             </button>
           ))}
         </div>
-        <div className="flex flex-col gap-3">
-          {rightShuffled.map(r => {
-            const isMatchedRight = Object.values(matched).includes(r);
+
+        {/* RIGHT */}
+
+        <div className="space-y-3">
+          {rightItems.map(right => {
+            const used =
+              Object.values(matched).includes(right);
+
             return (
               <button
-                key={r}
-                disabled={isMatchedRight}
-                onClick={() => pickRight(r)}
-                className={`px-3 py-3 rounded-xl2 font-medium border-2 text-left
-                  ${isMatchedRight ? 'border-mint bg-mint/10 text-gray-400' : wrongFlash === r ? 'border-coral bg-coral/10' : 'border-gray-200 hover:border-sky'}`}
+                key={right}
+                disabled={used}
+                onClick={() => pickRight(right)}
+                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all
+                  ${
+                    used
+                      ? 'border-mint bg-mint bg-opacity-20 text-gray-500'
+                      : wrongFlash === right
+                      ? 'border-coral bg-coral bg-opacity-10'
+                      : 'border-gray-200 hover:border-sky'
+                  }`}
               >
-                {r}
+                {right}
               </button>
             );
           })}
         </div>
+
       </div>
 
       {allMatched && (
         <button
-          onClick={handleContinue}
-          className="mt-6 w-full py-3 rounded-xl2 font-display font-bold text-white bg-coral"
+          onClick={handleSubmit}
+          className="w-full mt-6 bg-coral text-white font-display font-bold py-3 rounded-lg hover:bg-opacity-90 transition-all"
         >
-          Continue
+          Submit Answer
         </button>
       )}
+
     </div>
   );
 }
 
-function shuffle(arr) {
-  return [...arr].sort(() => Math.random() - 0.5);
+function shuffle(array) {
+  const arr = [...array];
+
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+
+  return arr;
 }

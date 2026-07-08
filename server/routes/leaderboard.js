@@ -1,33 +1,45 @@
 const express = require('express');
-const db = require('../db/database');
-const { requireAuth } = require('../middleware/auth');
-
 const router = express.Router();
+const db = require('../db/database');
 
-// GET /api/leaderboard?range=daily|weekly|overall
-router.get('/', requireAuth, (req, res) => {
-  const range = req.query.range || 'overall';
+router.get('/', (req, res) => {
+  const { period = 'overall' } = req.query; // daily, weekly, overall
 
-  let dateFilter = '1=1';
-  if (range === 'daily') dateFilter = "date(a.completed_at) = date('now')";
-  if (range === 'weekly') dateFilter = "date(a.completed_at) >= date('now', '-6 days')";
+  let dateFilter = '';
+  if (period === 'daily') {
+    dateFilter = `AND DATE(a.completed_at) = DATE('now')`;
+  } else if (period === 'weekly') {
+    dateFilter = `AND DATE(a.completed_at) >= DATE('now', '-7 days')`;
+  }
 
-  const rows = db.prepare(`
-    SELECT u.id, u.name, u.level,
-           COALESCE(SUM(a.xp_awarded), 0) as xp,
-           COUNT(a.id) as activities_completed
-    FROM users u
-    LEFT JOIN attempts a ON a.user_id = u.id AND ${dateFilter}
-    WHERE u.role = 'student'
-    GROUP BY u.id
-    ORDER BY xp DESC
-    LIMIT 50
-  `).all();
+  try {
+    const leaderboard = db.prepare(`
+      SELECT 
+        u.id,
+        u.name,
+        u.level,
+        u.xp,
+        COUNT(DISTINCT a.activity_id) as completed_activities,
+        COUNT(DISTINCT ub.badge_id) as badges_earned
+      FROM users u
+      LEFT JOIN attempts a ON u.id = a.user_id ${dateFilter}
+      LEFT JOIN user_badges ub ON u.id = ub.user_id
+      WHERE u.role = 'student'
+      GROUP BY u.id
+      ORDER BY u.xp DESC
+      LIMIT 100
+    `).all();
 
-  const withRank = rows.map((r, i) => ({ ...r, rank: i + 1 }));
-  const myRank = withRank.find(r => r.id === req.user.id) || null;
+    const rankedLeaderboard = leaderboard.map((user, index) => ({
+      ...user,
+      rank: index + 1
+    }));
 
-  res.json({ range, leaderboard: withRank, myRank });
+    res.json({ leaderboard: rankedLeaderboard });
+  } catch (error) {
+    console.error('Leaderboard error:', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
 });
 
 module.exports = router;

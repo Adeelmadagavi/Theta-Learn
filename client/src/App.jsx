@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
-import { getToken, clearToken } from './lib/api';
+import { getToken, getRole, clearToken } from './lib/api';
 import Login from './pages/Login';
 import StudentDashboard from './pages/StudentDashboard';
 import TopicList from './pages/TopicList';
@@ -13,6 +13,12 @@ import Footer from './components/Footer';
 function RequireAuth({ children }) {
   return getToken() ? children : <Navigate to="/login" replace />;
 }
+
+// import AppRoutes from "./AppRoutes";
+
+// export default function App() {
+//   return <AppRoutes />;
+// }
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -27,36 +33,43 @@ export default function App() {
 
   // Hide footer on login page
   const isLoginPage = location.pathname === '/login';
+  const role = getRole();
+  const homePath = role === 'teacher' ? '/teacher' : '/dashboard';
 
   return (
     <div className="min-h-screen bg-cloud flex flex-col">
       {getToken() && (
-        <nav className="bg-white shadow-sm px-6 py-3 flex justify-between items-center">
-          <Link to="/dashboard" className="font-display font-extrabold text-2xl text-ink hover:text-sky transition-colors">
-            Theta Learn
-          </Link>
-          <div className="flex gap-4 text-sm font-medium font-body">
-            <Link 
-              to="/dashboard" 
-              className="text-gray-500 hover:text-ink transition-colors"
-            >
-              Dashboard
-            </Link>
-            <Link 
-              to="/leaderboard" 
-              className="text-gray-500 hover:text-ink transition-colors"
-            >
-              Leaderboard
-            </Link>
-            <button 
-              onClick={handleLogout} 
-              className="text-coral hover:text-red-600 transition-colors"
-            >
-              Log out
-            </button>
-          </div>
-        </nav>
-      )}
+  <nav className="bg-white shadow-sm px-4 md:px-6 py-3">
+    <div className="flex flex-col md:flex-row justify-between items-center gap-3 md:gap-0">
+      <Link 
+        to="/dashboard" 
+        className="font-display font-extrabold text-xl md:text-2xl text-ink hover:text-sky transition-colors"
+      >
+        Theta Learn
+      </Link>
+      <div className="flex gap-3 md:gap-4 text-sm font-medium font-body">
+        <Link 
+          to="/dashboard" 
+          className="text-gray-500 hover:text-ink transition-colors px-2 py-1"
+        >
+          Dashboard
+        </Link>
+        <Link 
+          to="/leaderboard" 
+          className="text-gray-500 hover:text-ink transition-colors px-2 py-1"
+        >
+          Leaderboard
+        </Link>
+        <button 
+          onClick={handleLogout} 
+          className="text-coral hover:text-red-600 transition-colors px-2 py-1"
+        >
+          Log out
+        </button>
+      </div>
+    </div>
+  </nav>
+)}
 
       <main className="flex-1">
         <Routes>

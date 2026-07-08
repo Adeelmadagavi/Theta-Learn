@@ -1,21 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
-/**
- * Generic quiz engine. Renders ANY quiz activity from its content_json --
- * no per-question code. Content shape (see server/db/seed.js):
- *   { question, options: string[], answerIndex: number, explanation?: string }
- *
- * Props:
- *   content   - the parsed content object above
- *   onComplete(result) - called once with { correct: boolean, score: 0|1, timeTakenSeconds }
- *                        so the parent can POST /api/activities/:id/attempt
- */
 export default function QuizEngine({ content, onComplete }) {
+  const {
+    question = '',
+    options = [],
+    answerIndex,
+    correctAnswer,
+    explanation = ''
+  } = content || {};
+
   const [selected, setSelected] = useState(null);
   const [submitted, setSubmitted] = useState(false);
-  const [startTime] = useState(() => Date.now());
 
-  const isCorrect = selected === content.answerIndex;
+  const startTime = useRef(Date.now());
+
+  const expectedAnswer =
+    answerIndex !== undefined
+      ? options[answerIndex]
+      : correctAnswer;
+
+  const isCorrect =
+    selected !== null &&
+    String(options[selected] || '')
+      .trim()
+      .toLowerCase() ===
+      String(expectedAnswer || '')
+        .trim()
+        .toLowerCase();
 
   function handleSubmit() {
     if (selected === null) return;
@@ -26,68 +37,108 @@ export default function QuizEngine({ content, onComplete }) {
     onComplete({
       correct: isCorrect,
       score: isCorrect ? 1 : 0,
-      timeTakenSeconds: Math.round((Date.now() - startTime) / 1000)
+      timeTakenSeconds: Math.floor(
+        (Date.now() - startTime.current) / 1000
+      )
     });
   }
 
   return (
-    <div className="max-w-xl mx-auto bg-white rounded-xl2 shadow-md p-6 font-body">
-      <h2 className="font-display font-bold text-xl text-ink mb-5">{content.question}</h2>
+    <div className="max-w-xl mx-auto bg-white rounded-xl2 shadow-md p-6">
 
-      <div className="flex flex-col gap-3" role="radiogroup" aria-label={content.question}>
-        {content.options.map((opt, idx) => {
-          const isChosen = selected === idx;
-          const isAnswer = idx === content.answerIndex;
+      <h2 className="font-display font-bold text-xl text-ink mb-6">
+        {question}
+      </h2>
 
-          let stateClasses = 'border-2 border-gray-200 hover:border-sky';
-          if (submitted && isAnswer) stateClasses = 'border-2 border-mint bg-mint/10';
-          else if (submitted && isChosen && !isAnswer) stateClasses = 'border-2 border-coral bg-coral/10';
-          else if (!submitted && isChosen) stateClasses = 'border-2 border-sky bg-sky/10';
+      <div className="space-y-3">
+        {options.map((option, index) => {
+
+          const selectedOption = selected === index;
+
+          const correctOption =
+            String(option).trim().toLowerCase() ===
+            String(expectedAnswer || '')
+              .trim()
+              .toLowerCase();
+
+          let classes =
+            'border-2 border-gray-200 hover:border-sky';
+
+          if (!submitted && selectedOption) {
+            classes =
+              'border-2 border-sky bg-sky bg-opacity-10';
+          }
+
+          if (submitted) {
+            if (correctOption) {
+              classes =
+                'border-2 border-mint bg-mint bg-opacity-20';
+            } else if (selectedOption) {
+              classes =
+                'border-2 border-coral bg-coral bg-opacity-20';
+            }
+          }
 
           return (
             <button
-              key={idx}
-              type="button"
-              role="radio"
-              aria-checked={isChosen}
+              key={index}
+              onClick={() => setSelected(index)}
               disabled={submitted}
-              onClick={() => setSelected(idx)}
-              className={`text-left px-4 py-3 rounded-xl2 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-sky ${stateClasses} ${submitted ? 'cursor-default' : 'cursor-pointer'}`}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-all ${classes}`}
             >
-              {opt}
+              {option}
             </button>
           );
         })}
       </div>
 
-      {!submitted && (
+      {!submitted ? (
         <button
-          type="button"
           onClick={handleSubmit}
           disabled={selected === null}
-          className="mt-6 w-full py-3 rounded-xl2 font-display font-bold text-white bg-ink disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full mt-6 bg-ink text-white font-display font-bold py-3 rounded-lg disabled:opacity-50"
         >
-          Check answer
+          Check Answer
         </button>
-      )}
+      ) : (
+        <>
+          <div className="mt-6">
 
-      {submitted && (
-        <div className="mt-5">
-          <p className={`font-display font-bold ${isCorrect ? 'text-mint' : 'text-coral'}`}>
-            {isCorrect ? 'Correct! 🎉' : 'Not quite.'}
-          </p>
-          {content.explanation && (
-            <p className="text-sm text-gray-600 mt-1">{content.explanation}</p>
-          )}
+            <div
+              className={`font-display text-lg font-bold ${
+                isCorrect
+                  ? 'text-mint'
+                  : 'text-coral'
+              }`}
+            >
+              {isCorrect
+                ? '🎉 Correct!'
+                : '❌ Incorrect'}
+            </div>
+
+            {!isCorrect && (
+              <div className="mt-2 text-gray-600">
+                Correct Answer:
+                <strong> {expectedAnswer}</strong>
+              </div>
+            )}
+
+            {explanation && (
+              <div className="mt-3 text-gray-500">
+                {explanation}
+              </div>
+            )}
+          </div>
+
           <button
-            type="button"
             onClick={handleContinue}
-            className="mt-4 w-full py-3 rounded-xl2 font-display font-bold text-white bg-coral"
+            className="w-full mt-6 bg-coral text-white font-display font-bold py-3 rounded-lg hover:bg-opacity-90"
           >
             Continue
           </button>
-        </div>
+        </>
       )}
+
     </div>
   );
 }

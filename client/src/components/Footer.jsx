@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
 
@@ -36,14 +38,14 @@ export default function Footer() {
             <h4 className="font-display font-bold text-sm mb-3 text-sky">Quick Links</h4>
             <ul className="space-y-2 font-body text-sm">
               <li>
-                <a href="/dashboard" className="hover:text-sunshine transition-colors">
+                <Link to="/dashboard" className="hover:text-sunshine transition-colors">
                   📊 Dashboard
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/leaderboard" className="hover:text-sunshine transition-colors">
+                <Link to="/leaderboard" className="hover:text-sunshine transition-colors">
                   🏆 Leaderboard
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -53,14 +55,14 @@ export default function Footer() {
             <h4 className="font-display font-bold text-sm mb-3 text-mint">Subjects</h4>
             <ul className="space-y-2 font-body text-sm">
               <li>
-                <a href="/subjects/1" className="hover:text-sunshine transition-colors">
+                <Link to="/subjects/1" className="hover:text-sunshine transition-colors">
                   ➕ Mathematics
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="/subjects/2" className="hover:text-sunshine transition-colors">
+                <Link to="/subjects/2" className="hover:text-sunshine transition-colors">
                   🔬 Science
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

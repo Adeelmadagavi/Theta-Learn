@@ -1,4 +1,5 @@
 const TOKEN_KEY = 'theta_token';
+const ROLE_KEY = 'theta_role';
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -8,6 +9,13 @@ export function setToken(token) {
 }
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+}
+export function getRole() {
+  return localStorage.getItem(ROLE_KEY);
+}
+export function setRole(role) {
+  localStorage.setItem(ROLE_KEY, role);
 }
 
 export async function api(path, { method = 'GET', body } = {}) {

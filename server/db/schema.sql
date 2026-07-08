@@ -87,3 +87,12 @@ CREATE TABLE IF NOT EXISTS daily_spins (
 CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id);
 CREATE INDEX IF NOT EXISTS idx_activities_topic ON activities(topic_id);
 CREATE INDEX IF NOT EXISTS idx_topics_subject ON topics(subject_id);
+
+CREATE TABLE IF NOT EXISTS daily_challenges (
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  activity_id INTEGER NOT NULL REFERENCES activities(id),
+  challenge_date TEXT NOT NULL,
+  completed INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, challenge_date)
+);
+

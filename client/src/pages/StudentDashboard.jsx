@@ -1,79 +1,187 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { Link } from 'react-router-dom';
+import DailyChallenge from '../components/DailyChallenge';
 
 export default function StudentDashboard() {
-  const [data, setData] = useState(null);
+  const [stats, setStats] = useState(null);
   const [subjects, setSubjects] = useState([]);
+  const [myRank, setMyRank] = useState(null);
 
   useEffect(() => {
-    api('/student/dashboard').then(setData);
-    api('/subjects').then(setSubjects);
+    async function loadDashboard() {
+      try {
+        const [statsData, subjectsData, leaderboardData] = await Promise.all([
+          api('/user/stats'),
+          api('/subjects'),
+          api('/leaderboard')
+        ]);
+
+        setStats(statsData);
+
+        // Backend returns an array, not { subjects: [...] }
+        setSubjects(Array.isArray(subjectsData) ? subjectsData : (subjectsData?.subjects || []));
+
+        // Read the correct token key
+        const token = localStorage.getItem('theta_token');
+
+        if (token && leaderboardData?.leaderboard) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const userEntry = leaderboardData.leaderboard.find(
+            user => user.id === payload.id
+          );
+
+          setMyRank(userEntry?.rank || null);
+        }
+      } catch (err) {
+        console.error('Dashboard Error:', err);
+        setSubjects([]);
+      }
+    }
+
+    loadDashboard();
   }, []);
 
-  if (!data) return <div className="text-center py-20 text-gray-400">Loading...</div>;
-
-  const xpIntoLevel = data.user.xp - (data.user.level - 1) * 100;
+  if (!stats) {
+    return (
+      <div className="p-8 text-center text-gray-400">
+        Loading...
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 font-body">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+
+      <div className="mb-6">
+        <DailyChallenge />
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Level" value={data.user.level} accent="bg-ink" />
-        <StatCard label="XP" value={data.user.xp} accent="bg-sunshine" dark />
-        <StatCard label="Coins" value={data.user.coins} accent="bg-sunshine" dark />
-        <StatCard label="Streak" value={`${data.streak.current_streak} 🔥`} accent="bg-coral" />
-      </div>
 
-      <div className="bg-white rounded-xl2 shadow-sm p-5 mb-8">
-        <div className="flex justify-between text-sm text-gray-500 mb-1">
-          <span>Level {data.user.level}</span>
-          <span>{xpIntoLevel} / 100 XP to next level</span>
-        </div>
-        <div className="h-3 rounded-full bg-gray-100 overflow-hidden">
-          <div className="h-full bg-mint" style={{ width: `${Math.min(100, xpIntoLevel)}%` }} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {subjects.map(s => (
-          <Link
-            key={s.id}
-            to={`/subjects/${s.id}`}
-            className="bg-white rounded-xl2 shadow-sm p-5 hover:shadow-md transition-shadow"
-          >
-            <h3 className="font-display font-bold text-lg">{s.name}</h3>
-            <p className="text-sm text-gray-500 mt-1">
-              {data.subjectProgress.find(p => p.subject === s.name)?.done || 0} / {data.subjectProgress.find(p => p.subject === s.name)?.total || 0} activities done
-            </p>
-          </Link>
-        ))}
-      </div>
-
-      {data.recentBadges.length > 0 && (
-        <div className="bg-white rounded-xl2 shadow-sm p-5">
-          <h3 className="font-display font-bold mb-3">Recent badges</h3>
-          <div className="flex gap-3 flex-wrap">
-            {data.recentBadges.map(b => (
-              <span key={b.id} className="px-3 py-2 rounded-xl2 bg-cloud text-sm font-medium">
-                {b.icon} {b.name}
-              </span>
-            ))}
+        <div className="bg-white rounded-xl2 shadow-md p-6 text-center">
+          <div className="text-3xl mb-2">⭐</div>
+          <div className="font-display font-bold text-2xl text-ink">
+            {stats.level}
+          </div>
+          <div className="font-body text-sm text-gray-500">
+            Level
           </div>
         </div>
-      )}
 
-      <div className="mt-8 flex gap-3">
-        <Link to="/leaderboard" className="text-sky font-medium">View leaderboard →</Link>
+        <div className="bg-white rounded-xl2 shadow-md p-6 text-center">
+          <div className="text-3xl mb-2">💎</div>
+          <div className="font-display font-bold text-2xl text-coral">
+            {stats.xp}
+          </div>
+          <div className="font-body text-sm text-gray-500">
+            XP
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl2 shadow-md p-6 text-center">
+          <div className="text-3xl mb-2">🪙</div>
+          <div className="font-display font-bold text-2xl text-sunshine">
+            {stats.coins}
+          </div>
+          <div className="font-body text-sm text-gray-500">
+            Coins
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl2 shadow-md p-6 text-center">
+          <div className="text-3xl mb-2">🏆</div>
+          <div className="font-display font-bold text-2xl text-mint">
+            {myRank ? `#${myRank}` : '--'}
+          </div>
+          <div className="font-body text-sm text-gray-500">
+            Rank
+          </div>
+        </div>
+
       </div>
-    </div>
-  );
-}
 
-function StatCard({ label, value, accent, dark }) {
-  return (
-    <div className={`${accent} ${dark ? 'text-ink' : 'text-white'} rounded-xl2 p-4`}>
-      <p className="text-xs uppercase tracking-wide opacity-80">{label}</p>
-      <p className="font-display font-extrabold text-2xl">{value}</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+
+        <div className="bg-white rounded-xl2 shadow-md p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-sm text-gray-500">
+              Streak
+            </span>
+            <span className="text-2xl">🔥</span>
+          </div>
+
+          <div className="font-display font-bold text-xl text-ink">
+            {stats.currentStreak || 0} days
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl2 shadow-md p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-sm text-gray-500">
+              Completed
+            </span>
+            <span className="text-2xl">✓</span>
+          </div>
+
+          <div className="font-display font-bold text-xl text-ink">
+            {stats.completedActivities || 0} / 30
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl2 shadow-md p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-sm text-gray-500">
+              Badges
+            </span>
+            <span className="text-2xl">🏅</span>
+          </div>
+
+          <div className="font-display font-bold text-xl text-ink">
+            {stats.badgesEarned || 0}
+          </div>
+        </div>
+
+      </div>
+
+      <div>
+        <h2 className="font-display font-bold text-2xl text-ink mb-4">
+          Subjects
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {(subjects || []).map(subject => (
+            <Link
+              key={subject.id}
+              to={`/subjects/${subject.id}`}
+              className="bg-white rounded-xl2 shadow-md p-6 hover:shadow-lg transition-shadow"
+            >
+              <div className="flex items-center gap-4">
+
+                <div className="text-4xl">
+                  {subject.name === 'Mathematics' ? '➕' : '🔬'}
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="font-display font-bold text-lg text-ink mb-1">
+                    {subject.name}
+                  </h3>
+
+                  <div className="font-body text-sm text-gray-500">
+                    {subject.topicCount || 5} Topics
+                  </div>
+                </div>
+
+                <div className="text-sky">→</div>
+
+              </div>
+            </Link>
+          ))}
+
+        </div>
+      </div>
+
     </div>
   );
 }

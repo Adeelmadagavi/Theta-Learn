@@ -6,7 +6,11 @@ const { applyRewards, suggestNextDifficulty } = require('../lib/gamification');
 const router = express.Router();
 
 router.get('/subjects', requireAuth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM subjects').all());
+  const subjects = db.prepare('SELECT * FROM subjects').all();
+
+  res.json({
+    subjects
+  });
 });
 
 router.get('/subjects/:id/topics', requireAuth, (req, res) => {

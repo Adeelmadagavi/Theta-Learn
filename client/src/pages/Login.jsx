@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, setToken } from '../lib/api';
+import { api, setToken, setRole } from '../lib/api';
 
 export default function Login({ onAuth }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
@@ -15,6 +15,7 @@ export default function Login({ onAuth }) {
       const path = mode === 'login' ? '/auth/login' : '/auth/register';
       const data = await api(path, { method: 'POST', body: form });
       setToken(data.token);
+      setRole(data.user.role);
       onAuth(data.user);
       navigate(data.user.role === 'teacher' ? '/teacher' : '/dashboard');
     } catch (err) {

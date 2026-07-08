@@ -1,65 +1,87 @@
 import { useState, useEffect, useRef } from 'react';
 
 export default function MemoryEngine({ content, onComplete }) {
-  const { instruction, pairs } = content;
+  const {
+    instruction = '',
+    pairs = []
+  } = content || {};
+
   const [cards, setCards] = useState([]);
   const [flipped, setFlipped] = useState([]);
   const [matched, setMatched] = useState([]);
   const [moves, setMoves] = useState(0);
-  const startTime = useRef(Date.now());
 
-  // Initialize and shuffle cards
+  const startTime = useRef(Date.now());
+  const hasCompleted = useRef(false);
+
   useEffect(() => {
-    const cardArray = pairs.flatMap((pair, pairIndex) => [
-      { id: `${pairIndex}-a`, content: pair.a, pairIndex },
-      { id: `${pairIndex}-b`, content: pair.b, pairIndex }
-    ]);
-    
-    const shuffled = cardArray.sort(() => Math.random() - 0.5);
-    setCards(shuffled);
+    const deck = [];
+
+    pairs.forEach((pair, index) => {
+      deck.push({
+        id: `${index}-a`,
+        content: pair.a,
+        pairIndex: index
+      });
+
+      deck.push({
+        id: `${index}-b`,
+        content: pair.b,
+        pairIndex: index
+      });
+    });
+
+    setCards(shuffle(deck));
   }, [pairs]);
 
-  // Check for matches when two cards are flipped
   useEffect(() => {
-    if (flipped.length === 2) {
-      const [first, second] = flipped;
-      const firstCard = cards.find(c => c.id === first);
-      const secondCard = cards.find(c => c.id === second);
+    if (flipped.length !== 2) return;
 
-      if (firstCard.pairIndex === secondCard.pairIndex) {
-        // Match found!
-        setMatched(prev => [...prev, ...flipped]);
+    const first = cards.find(c => c.id === flipped[0]);
+    const second = cards.find(c => c.id === flipped[1]);
+
+    if (!first || !second) return;
+
+    setMoves(prev => prev + 1);
+
+    if (first.pairIndex === second.pairIndex) {
+      setMatched(prev => [...prev, first.id, second.id]);
+      setFlipped([]);
+    } else {
+      const timer = setTimeout(() => {
         setFlipped([]);
-      } else {
-        // No match - flip back after delay
-        setTimeout(() => {
-          setFlipped([]);
-        }, 1000);
-      }
-      
-      setMoves(prev => prev + 1);
+      }, 800);
+
+      return () => clearTimeout(timer);
     }
   }, [flipped, cards]);
 
-  // Check if game is complete
   useEffect(() => {
-    if (matched.length === cards.length && cards.length > 0) {
-      const timeTakenSeconds = Math.floor((Date.now() - startTime.current) / 1000);
-      
+    if (
+      cards.length > 0 &&
+      matched.length === cards.length &&
+      !hasCompleted.current
+    ) {
+      hasCompleted.current = true;
+
+      const timeTakenSeconds = Math.floor(
+        (Date.now() - startTime.current) / 1000
+      );
+
       setTimeout(() => {
         onComplete({
           correct: true,
           score: 1,
           timeTakenSeconds,
-          moves // Can be used for bonus XP later
+          moves: moves + 1
         });
       }, 500);
     }
-  }, [matched, cards, onComplete]);
+  }, [matched, cards, moves, onComplete]);
 
-  const handleCardClick = (cardId) => {
+  function handleCardClick(cardId) {
     if (
-      flipped.length === 2 ||
+      flipped.length >= 2 ||
       flipped.includes(cardId) ||
       matched.includes(cardId)
     ) {
@@ -67,18 +89,32 @@ export default function MemoryEngine({ content, onComplete }) {
     }
 
     setFlipped(prev => [...prev, cardId]);
-  };
+  }
 
-  const isFlipped = (cardId) => flipped.includes(cardId) || matched.includes(cardId);
-  const isMatched = (cardId) => matched.includes(cardId);
+  function isFlipped(cardId) {
+    return (
+      flipped.includes(cardId) ||
+      matched.includes(cardId)
+    );
+  }
+
+  function isMatched(cardId) {
+    return matched.includes(cardId);
+  }
 
   return (
     <div className="max-w-xl mx-auto">
-      <div className="bg-white rounded-xl2 shadow-md p-6 mb-4">
-        <h2 className="font-display text-2xl text-ink mb-2">{instruction}</h2>
-        <div className="flex justify-between font-body text-sm text-ink opacity-60">
+
+      <div className="bg-white rounded-xl2 shadow-md p-6 mb-5">
+        <h2 className="font-display text-2xl text-ink mb-2">
+          {instruction}
+        </h2>
+
+        <div className="flex justify-between text-sm text-gray-500">
           <span>Moves: {moves}</span>
-          <span>Pairs found: {matched.length / 2} / {pairs.length}</span>
+          <span>
+            Pairs: {matched.length / 2} / {pairs.length}
+          </span>
         </div>
       </div>
 
@@ -89,16 +125,15 @@ export default function MemoryEngine({ content, onComplete }) {
             onClick={() => handleCardClick(card.id)}
             disabled={isFlipped(card.id)}
             className={`
-              aspect-square rounded-lg font-body font-medium
-              transition-all transform
-              ${isFlipped(card.id)
-                ? isMatched(card.id)
-                  ? 'bg-mint text-white scale-95'
-                  : 'bg-sky text-white'
-                : 'bg-grape text-transparent hover:scale-105'
+              aspect-square rounded-lg p-2 text-center
+              transition-all font-medium flex items-center justify-center
+              ${
+                isFlipped(card.id)
+                  ? isMatched(card.id)
+                    ? 'bg-mint text-white'
+                    : 'bg-sky text-white'
+                  : 'bg-grape text-transparent hover:scale-105'
               }
-              ${!isFlipped(card.id) ? 'cursor-pointer' : 'cursor-default'}
-              flex items-center justify-center p-2 text-center text-sm
             `}
           >
             {isFlipped(card.id) ? card.content : '?'}
@@ -106,16 +141,36 @@ export default function MemoryEngine({ content, onComplete }) {
         ))}
       </div>
 
-      {matched.length === cards.length && cards.length > 0 && (
-        <div className="mt-6 text-center">
-          <div className="bg-mint bg-opacity-20 rounded-xl2 p-6">
-            <div className="text-4xl mb-2">🎉</div>
-            <div className="font-display text-xl text-ink">
-              All pairs found in {moves} moves!
+      {cards.length > 0 &&
+        matched.length === cards.length && (
+          <div className="mt-6 text-center">
+            <div className="bg-mint bg-opacity-20 rounded-xl2 p-6">
+              <div className="text-4xl mb-2">
+                🎉
+              </div>
+
+              <div className="font-display text-xl text-ink">
+                Memory Challenge Complete!
+              </div>
+
+              <div className="text-gray-600 mt-2">
+                Completed in {moves} moves
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
+}
+
+function shuffle(array) {
+  const arr = [...array];
+
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+
+  return arr;
 }
